@@ -25,7 +25,7 @@ thread and non-blockingly get the output as the command executes
 Note: this plugin is highly experimental, so it might make your vim process unstable
 
 Platform: 
-    only unix based operating systems are supported and apparently it doesn't works on gVim
+    only unix based operating systems are supported
 
 Requirements: 
     vim compiled with python support
