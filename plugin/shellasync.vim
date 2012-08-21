@@ -52,7 +52,10 @@ def ShellAsyncRefreshOutput(cmd):
                 if len(vim.current.buffer) == 1 and len(vim.current.buffer[0]) == 0:
                     vim.current.buffer[0] = out[0]
                     out = out[1:]
-                vim.current.buffer.append(out)
+                    if len(out) > 0:
+                        vim.current.buffer.append(out)
+                else:
+                    vim.current.buffer.append(out)
                 vim.command("call setpos('.',["+str(vim.current.buffer.number)+","+str(len(vim.current.buffer))+",0,0])")
     vim.command("call feedkeys(\"f\e\")")
 
