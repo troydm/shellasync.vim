@@ -43,7 +43,7 @@ class ShellAsyncOutput:
         self.lock.release()
 
 def ShellAsyncRefreshOutput(cmd):
-    global shellasync_bufs
+    global shellasync_bufs,shellasync_pids
     if cmd in shellasync_bufs:
         out = shellasync_bufs[cmd]
         if out != None:
@@ -57,6 +57,9 @@ def ShellAsyncRefreshOutput(cmd):
                 else:
                     vim.current.buffer.append(out)
                 vim.command("call setpos('.',["+str(vim.current.buffer.number)+","+str(len(vim.current.buffer))+",0,0])")
+            else:
+                if not cmd in shellasync_pids:
+                    shellasync_bufs.pop(cmd)                    
     vim.command("call feedkeys(\"f\e\")")
 
 def ShellAsyncExecuteCmd(cmd,print_retval):
