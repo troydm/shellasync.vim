@@ -117,7 +117,6 @@ def ShellAsyncExecuteInSubprocess(cmd,print_retval):
             else:
                 retval = p.poll()
                 if retval != None:
-                    shellasync_pids.pop(cmd)
                     break
         except IOError:
             pass
@@ -127,6 +126,7 @@ def ShellAsyncExecuteInSubprocess(cmd,print_retval):
     if print_retval:
         buf.extend(["","Shell command "+cmd+" completed with return value "+str(retval)])
     shellasync_cmds.pop(cmd)
+    shellasync_pids.pop(cmd)
 EOF
 
 function! s:ExecuteInShell(command)
