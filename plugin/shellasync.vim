@@ -1,6 +1,6 @@
 " shellasync.vim plugin for asynchronously executing shell commands in vim
 " Maintainer: Dmitry "troydm" Geurkov <d.geurkov@gmail.com>
-" Version: 0.2
+" Version: 0.2.1
 " Description: shellasync.vim plugin allows you to execute shell commands
 " asynchronously inside vim and see output in seperate buffer window.
 " Last Change: 23 August, 2012
@@ -75,7 +75,10 @@ def ShellAsyncExecuteCmd(cmd,print_retval):
 def ShellAsyncTermCmd(cmd):
     global shellasync_cmds,shellasync_pids
     if cmd in shellasync_cmds and cmd in shellasync_pids:
-        os.killpg(shellasync_pids[cmd],signal.SIGTERM)
+        try:
+            os.killpg(shellasync_pids[cmd],signal.SIGTERM)
+        except OSError:
+            os.kill(shellasync_pids[cmd],signal.SIGTERM)
         if cmd in shellasync_cmds:
             shellasync_cmds[cmd].join(15.0)
             if cmd in shellasync_pids:
@@ -86,7 +89,10 @@ def ShellAsyncTermCmd(cmd):
 def ShellAsyncKillCmd(cmd):
     global shellasync_cmds,shellasync_pids
     if cmd in shellasync_cmds and cmd in shellasync_pids:
-        os.killpg(shellasync_pids[cmd],signal.SIGKILL)
+        try:
+            os.killpg(shellasync_pids[cmd],signal.SIGKILL)
+        except OSError:
+            os.kill(shellasync_pids[cmd],signal.SIGKILL)
         if cmd in shellasync_cmds:
             shellasync_cmds[cmd].join(15.0)
             if cmd in shellasync_pids:
@@ -97,7 +103,10 @@ def ShellAsyncKillCmd(cmd):
 def ShellAsyncExecuteInSubprocess(cmd,print_retval):
     global shellasync_cmds,shellasync_pids,shellasync_bufs
     p = subprocess.Popen(cmd+" 2>&1", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    os.setpgid(p.pid,p.pid)
+    try:
+        os.setpgid(p.pid,p.pid)
+    except OSError:
+        pass
     fcntl.fcntl(p.stdout.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
     shellasync_pids[cmd] = p.pid
     time.sleep(0.5)
