@@ -1,10 +1,10 @@
-shellasync.vim for Vim version 7.0+   Last change: 23 August, 2012
+shellasync.vim for Vim version 7.0+   Last change: 24 August, 2012
 
 Maintainer: Dmitry "troydm" Geurkov <d.geurkov@gmail.com>
-Version: 0.2.1
+Version: 0.3
 Description: shellasync.vim plugin allows you to execute shell commands
 asynchronously inside vim and see output in seperate buffer window.
-Last Change: 23 August, 2012
+Last Change: 24 August, 2012
 License: Vim License (see :help license)
 Website: https://github.com/troydm/shellasync.vim
 
@@ -41,20 +41,23 @@ g:shellasync_print_return_value     (Default: '1')
  2. USAGE                                                         *shellasync.vim-usage*
 
                                                                   *Shell*
-:Shell {command}
+:Shell[!] {command}
     Execute a {command} in shell and opens a window to see it's output.
-    If same {command} is currently executing it sends *ShellTerm* to it's associated process id
+    If same {command} is currently executing it sends |ShellTerm| to it's associated process id
+    If [!] is specified, command is expanded using |expand()| function before execution
     Note: you can have only one {command} executing at the same time, because it is linked
     to a buffer with a same name, if buffer is wipedout/closed before command finished executing
-    SIGTERM is automaticly sent to the process id that is executing the command using *ShellTerm*
+    SIGTERM is automaticly sent to the process id that is executing the command using |ShellTerm|
 
                                                                   *ShellTerm*
-:ShellTerm {command}
+:ShellTerm[!] {command}
     If {command} is currently executing, sends a SIGTERM signal to it's associated process id
+    If [!] is specified, command is expanded using |expand()| function
 
                                                                   *ShellKill*
-:ShellKill {command}
+:ShellKill[!] {command}
     If {command} is currently executing, sends a SIGKILL signal to it's associated process id
+    If [!] is specified, command is expanded using |expand()| function
 
                                                                   *ShellsRunning*
 :ShellsRunning
