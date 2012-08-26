@@ -1,9 +1,9 @@
 " shellasync.vim plugin for asynchronously executing shell commands in vim
 " Maintainer: Dmitry "troydm" Geurkov <d.geurkov@gmail.com>
-" Version: 0.3.1
+" Version: 0.3.2
 " Description: shellasync.vim plugin allows you to execute shell commands
 " asynchronously inside vim and see output in seperate buffer window.
-" Last Change: 25 August, 2012
+" Last Change: 27 August, 2012
 " License: Vim License (see :help license)
 " Website: https://github.com/troydm/shellasync.vim
 "
@@ -104,6 +104,22 @@ def ShellAsyncKillCmd():
                 return False
     return True
 
+def ShellAsyncTermAllCmds():
+    global shellasync_cmds,shellasync_pids
+    for cmd in list(shellasync_pids.keys()):
+        try:
+            os.killpg(shellasync_pids[cmd],signal.SIGTERM)
+        except OSError:
+            os.kill(shellasync_pids[cmd],signal.SIGTERM)
+        if cmd in shellasync_cmds:
+            shellasync_cmds[cmd].join(15.0)
+            if cmd in shellasync_pids:
+                try:
+                    os.killpg(shellasync_pids[cmd],signal.SIGKILL)
+                except OSError:
+                    os.kill(shellasync_pids[cmd],signal.SIGKILL)
+                shellasync_cmds[cmd].join(5.0)
+
 def ShellAsyncExecuteInSubprocess(cmd,print_retval):
     global shellasync_cmds,shellasync_pids,shellasync_bufs
     p = subprocess.Popen(cmd+" 2>&1", shell=True, preexec_fn=os.setsid, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -189,4 +205,5 @@ command! -complete=shellcmd -bang -nargs=+ Shell call s:ExecuteInShell('<bang>',
 command! -complete=shellcmd -bang -nargs=+ ShellTerm call s:TermShell('<bang>',<q-args>)
 command! -complete=shellcmd -bang -nargs=+ ShellKill call s:KillShell('<bang>',<q-args>)
 command! ShellsRunning python print shellasync_pids
+au VimLeavePre * python ShellAsyncTermAllCmds()
 
