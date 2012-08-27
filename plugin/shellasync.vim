@@ -1,6 +1,6 @@
 " shellasync.vim plugin for asynchronously executing shell commands in vim
 " Maintainer: Dmitry "troydm" Geurkov <d.geurkov@gmail.com>
-" Version: 0.3.2
+" Version: 0.3.3
 " Description: shellasync.vim plugin allows you to execute shell commands
 " asynchronously inside vim and see output in seperate buffer window.
 " Last Change: 27 August, 2012
@@ -125,7 +125,6 @@ def ShellAsyncExecuteInSubprocess(cmd,print_retval):
     p = subprocess.Popen(cmd+" 2>&1", shell=True, preexec_fn=os.setsid, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     fcntl.fcntl(p.stdout.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
     shellasync_pids[cmd] = p.pid
-    time.sleep(0.5)
     retval = None
     out = ''
     shellasync_bufs[cmd] = ShellAsyncOutput()
@@ -133,20 +132,21 @@ def ShellAsyncExecuteInSubprocess(cmd,print_retval):
     while True:
         try:
             outread = p.stdout.read()
-            if len(outread) > 0:
+            if len(outread) == 0:
+                retval = p.poll()
+                if retval != None:
+                    break
+                else:
+                    time.sleep(0.25)
+            else:
                 out += outread
                 while out.find("\n") != -1:
                     out = out.split("\n")
                     lines = out[:-1]
                     out = out[-1]
                     buf.extend(lines)
-            else:
-                retval = p.poll()
-                if retval != None:
-                    break
         except IOError:
             pass
-        time.sleep(0.5)
     if len(out) > 0:
         buf.extend(out)
     if print_retval:
