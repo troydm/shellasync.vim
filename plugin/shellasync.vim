@@ -168,6 +168,7 @@ function! s:ExecuteInShell(bang, command)
     if winnr < 0
         execute &lines/3 . 'sp ' . fnameescape(command)
         setlocal buftype=nofile bufhidden=wipe nobuflisted noswapfile nowrap
+        setlocal filetype=shellasync
         call setbufvar("%","prevupdatetime",&updatetime)
         call setbufvar("%","command",command)
         set updatetime=500
