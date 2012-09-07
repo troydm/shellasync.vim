@@ -5,7 +5,7 @@ shellasync.vim plugin for asynchronously executing shell commands in vim
 
 
 Introduction
-============
+------------
 shellasync.vim plugin allows you to asynchronously execute shell commands inside vim 
 and see output inside a seperate window buffer without waiting for a command to finish.
 It uses python's subprocess and threading capabilities to execute shell commands in seperate
@@ -19,7 +19,11 @@ Platform:
 Requirements: 
     vim compiled with python support
 
+Screenshot
+----------
+![image](http://imgur.com/GxM0U.png)
+
 Usage
-=====
+-----
 
 See :help shellasync

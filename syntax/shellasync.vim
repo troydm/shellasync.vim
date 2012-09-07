@@ -1,9 +1,9 @@
 " shellasync.vim plugin for asynchronously executing shell commands in vim
 " Maintainer: Dmitry "troydm" Geurkov <d.geurkov@gmail.com>
-" Version: 0.3.3
+" Version: 0.3.4
 " Description: shellasync.vim plugin allows you to execute shell commands
 " asynchronously inside vim and see output in seperate buffer window.
-" Last Change: 27 August, 2012
+" Last Change: 8 September, 2012
 " License: Vim License (see :help license)
 " Website: https://github.com/troydm/shellasync.vim
 "

@@ -1,10 +1,10 @@
-shellasync.vim for Vim version 7.0+   Last change: 27 August, 2012
+shellasync.vim for Vim version 7.0+   Last change: 8 September, 2012
 
 Maintainer: Dmitry "troydm" Geurkov <d.geurkov@gmail.com>
-Version: 0.3.3
+Version: 0.3.4
 Description: shellasync.vim plugin allows you to execute shell commands
 asynchronously inside vim and see output in seperate buffer window.
-Last Change: 27 August, 2012
+Last Change: 8 September, 2012
 License: Vim License (see :help license)
 Website: https://github.com/troydm/shellasync.vim
 
@@ -43,24 +43,38 @@ g:shellasync_print_return_value     (Default: '1')
                                                                   *Shell*
 :Shell[!] {command}
     Execute a {command} in shell and opens a window to see it's output.
-    If same {command} is currently executing it sends |ShellTerm| to it's associated process id
     If [!] is specified, command is expanded using |expand()| function before execution
-    Note: you can have only one {command} executing at the same time, because it is linked
-    to a buffer with a same name, if buffer is wipedout/closed before command finished executing
-    SIGTERM is automaticly sent to the process id that is executing the command using |ShellTerm|
+    Buffer name is the same as {command} you've executed
+    If same {command} is currently open in it's dedicated window it switches to 
+    that window instead opening new one, if you want new window use |ShellNew|
+    If previously executed {command} is running it automaticly does
+    |ShellTerm| of that {command} and |ShellDelete| the remaining shell process
+    Note: each command {command} opens a buffer window with same name as
+    command and when this buffer is deleted the associated process id receives
+    |ShellTerm| and |ShellDelete| commands
+
+                                                                  *ShellNew*
+:ShellNew[!] {command}
+    Same as |Shell| only opens each same {command} in new window each time
+
+                                                                  *ShellList*
+:ShellList
+    Opens a new window buffer with a list of currently running and finished
+    shell processes. You can move your cursor over the the process line and 
+    press t to send SIGTERM signal to that process, press K to send SIGKILL 
+    signal to that process and press x or d to delete shell process from list 
 
                                                                   *ShellTerm*
-:ShellTerm[!] {command}
-    If {command} is currently executing, sends a SIGTERM signal to it's associated process id
-    If [!] is specified, command is expanded using |expand()| function
+:ShellTerm [pid]
+    If shell process with {pid} is currently running, send a SIGTERM signal
 
                                                                   *ShellKill*
-:ShellKill[!] {command}
-    If {command} is currently executing, sends a SIGKILL signal to it's associated process id
-    If [!] is specified, command is expanded using |expand()| function
+:ShellKill [pid]
+    If shell process with {pid} is currently running, send a SIGKILL signal
 
-                                                                  *ShellsRunning*
-:ShellsRunning
-    prints currently running shell commands with associated process ids
+                                                                  *ShellDelete*
+:ShellDelete [pid]
+    If shell process with {pid} finished executing, remove it from shell
+    process list
 
  vim:tw=78:ts=8:ft=help:norl:
