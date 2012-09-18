@@ -1,10 +1,10 @@
-shellasync.vim for Vim version 7.0+   Last change: 8 September, 2012
+shellasync.vim for Vim version 7.0+   Last change: 19 September, 2012
 
 Maintainer: Dmitry "troydm" Geurkov <d.geurkov@gmail.com>
-Version: 0.3.4
+Version: 0.3.5
 Description: shellasync.vim plugin allows you to execute shell commands
 asynchronously inside vim and see output in seperate buffer window.
-Last Change: 8 September, 2012
+Last Change: 19 September, 2012
 License: Vim License (see :help license)
 Website: https://github.com/troydm/shellasync.vim
 
@@ -34,11 +34,34 @@ Requirements:
  2. CONFIGURATION                                         *shellasync.vim-configuration*
 
                                                          *g:shellasync_print_return_value*
-g:shellasync_print_return_value     (Default: '1')
+g:shellasync_print_return_value     (Default: '0')
     Print command's return value when command finishes it's execution
+
+                                                         *g:shellasync_terminal_insert_on_enter*
+g:shellasync_terminal_insert_on_enter     (Default: '1')
+    Go to insert mode automaticly when you enter |ShellTerminal| buffer
 
 ============================================================================================
  2. USAGE                                                         *shellasync.vim-usage*
+
+                                                                  *ShellTerminal*
+:ShellTerminal
+    Open new shell pseudo terminal. This terminal emulates real shell. 
+    Just type your commands to have them executed in terminal
+    All commands are executed as system shell commands except commands
+    such as the following commands:
+        |pwd| command prints current working directory
+        |cd| command makes you change current working directory
+        |env| prints 
+        |setenv| or |export| to change global enviroment variables
+        |unset| unsets global enviroment variable
+        |exit| to exit pseudo shell
+    Those commands are executed entirely by pseudo shell
+    System shell commands that change current working directory and/or global
+    enviroment variables won't affect pseudo terminal's current working
+    directory or global enviroment variables
+    Note: changes of current working directory or global enviroment variables
+    are only active in pseudo terminal and won't affect vim's settings
 
                                                                   *Shell*
 :Shell[!] {command}

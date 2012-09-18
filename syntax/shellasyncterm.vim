@@ -16,12 +16,14 @@ endif
 let s:save_cpo = &cpo
 set cpo&vim
 
-syntax match ShellAsyncRetVal /^Shell command / 
-syntax match ShellAsyncRetVal / completed with return value / 
+syntax match ShellAsyncTermRetVal /^Shell command / 
+syntax match ShellAsyncTermRetVal / completed with return value / 
+syntax match ShellAsyncTermPrompt /^$ / 
 
-highlight default link ShellAsyncRetVal   Comment
+highlight default link ShellAsyncTermPrompt    Identifier
+highlight default link ShellAsyncTermRetVal   Comment
 
-let b:current_syntax = "shellasync"
+let b:current_syntax = "shellasyncterm"
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
