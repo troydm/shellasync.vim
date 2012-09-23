@@ -457,7 +457,7 @@ function! s:ExecuteInShell(bang, samewin, command)
     
     if winnr < 0 || !a:samewin
         execute &lines/3 . 'sp ' . fnameescape('shellasync '.shellnr.'- '.command)
-        setlocal buftype=nofile bufhidden=wipe buflisted noswapfile nowrap
+        setlocal buftype=nofile bufhidden=wipe buflisted noswapfile nowrap nonumber
         setlocal filetype=shellasync
         call setbufvar("%","prevupdatetime",&updatetime)
         call setbufvar("%","command",command)
@@ -518,7 +518,7 @@ function! s:OpenShellsList()
     let winnr = bufwinnr('^' . command . '$')
     if winnr < 0
         execute &lines/3 . 'sp ' . fnameescape(command)
-        setlocal buftype=nofile bufhidden=wipe nobuflisted noswapfile nowrap filetype=shellasynclist
+        setlocal buftype=nofile bufhidden=wipe nobuflisted noswapfile nowrap nonumber filetype=shellasynclist
         call setbufvar("%","prevupdatetime",&updatetime)
         call setbufvar("%","command",command)
         set updatetime=500
@@ -631,7 +631,11 @@ function! s:TerminalEnterPressed()
 endfunction
 function! s:TerminalBufEnter()
     if g:shellasync_terminal_insert_on_enter
-        startinsert
+        if b:cfinished
+            startinsert
+        else
+            normal! G
+        endif
     endif
 endfunction
 function! s:CloseShellTerminal()
@@ -647,7 +651,7 @@ function! s:OpenShellTerminal()
     endfor
     let termnr += 1
     execute 'belowright '.(&lines/3) . 'sp ' . fnameescape('shellasyncterm - '.termnr)
-    setlocal buftype=nofile bufhidden=wipe buflisted noswapfile nowrap filetype=shellasyncterm
+    setlocal buftype=nofile bufhidden=wipe buflisted noswapfile nowrap nonumber filetype=shellasyncterm
     call setbufvar("%","prevupdatetime",&updatetime)
     call setbufvar("%","termnr",termnr)
     call setbufvar("%","pl",1)
