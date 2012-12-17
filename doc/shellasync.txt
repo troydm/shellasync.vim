@@ -1,10 +1,10 @@
-shellasync.vim for Vim version 7.0+   Last change: 19 September, 2012
+shellasync.vim for Vim version 7.0+   Last change: 17 December, 2012
 
 Maintainer: Dmitry "troydm" Geurkov <d.geurkov@gmail.com>
-Version: 0.3.5
+Version: 0.3.6
 Description: shellasync.vim plugin allows you to execute shell commands
 asynchronously inside vim and see output in seperate buffer window.
-Last Change: 19 September, 2012
+Last Change: 17 December, 2012
 License: Vim License (see :help license)
 Website: https://github.com/troydm/shellasync.vim
 
@@ -84,8 +84,10 @@ g:shellasync_terminal_insert_on_enter     (Default: '1')
 :ShellList
     Opens a new window buffer with a list of currently running and finished
     shell processes. You can move your cursor over the the process line and 
-    press t to send SIGTERM signal to that process, press K to send SIGKILL 
-    signal to that process and press x or d to delete shell process from list 
+    press |t| to send SIGTERM signal to that process, press |K| to send SIGKILL 
+    signal to that process and press |x| or |d| to delete shell process from list 
+    To send input to the process press |s| and provide input string
+    If |ShellList| is in pid selection mode you can use |S| to select pid
 
                                                                   *ShellTerm*
 :ShellTerm [pid]
@@ -99,5 +101,20 @@ g:shellasync_terminal_insert_on_enter     (Default: '1')
 :ShellDelete [pid]
     If shell process with {pid} finished executing, remove it from shell
     process list
+
+                                                                  *ShellSend*
+:[range]ShellSend [pid]
+    Sends [range] as input to a {pid} process
+    If no {pid} argument is provided uses {pid} associated with buffer
+    To associate {pid} with buffer use |ShellSelect|
+
+                                                                  *ShellSelect*
+:ShellSelect [pid]
+    Associate provided {pid} with current buffer
+    If no {pid} is provided opens a |ShellList| in pid selection mode
+
+                                                                  *ShellSelected*
+:ShellSelected
+    Print {pid} associated with current buffer
 
  vim:tw=78:ts=8:ft=help:norl:
