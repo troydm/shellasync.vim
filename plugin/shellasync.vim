@@ -83,21 +83,25 @@ class ShellAsyncOutput(threading.Thread):
         out = ''
         while True:
             try:
-                plr = pl.poll()[0][1]
-                if plr & select.POLLIN:
-                    outread = p.stdout.read()
-                else:
+                plr = pl.poll(100)
+                if len(plr) == 0:
                     outread = ''
-                    if plr & select.POLLOUT:
-                        wr = self.getWrite()
-                        if wr != None:
-                            p.stdin.flush()
-                            for w in wr:
-                                w = w+"\n"
-                                p.stdin.write(w)
-                                outread += w
-                            p.stdin.flush()
-                            time.sleep(0.001)
+                else:
+                    plr = plr[0][1]
+                    if plr & select.POLLIN:
+                        outread = p.stdout.read()
+                    else:
+                        outread = ''
+                if len(outread) == 0 and (type(plr) == list or (plr & select.POLLOUT)):
+                    wr = self.getWrite()
+                    if wr != None:
+                        p.stdin.flush()
+                        for w in wr:
+                            w = w+"\n"
+                            p.stdin.write(w)
+                            outread += w
+                        p.stdin.flush()
+                        time.sleep(0.001)
                 if len(outread) == 0:
                     retval = p.poll()
                     if retval != None:
