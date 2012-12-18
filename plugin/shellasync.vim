@@ -75,24 +75,37 @@ class ShellAsyncOutput(threading.Thread):
         self.lock.acquire()
         p = subprocess.Popen(self.command+" 2>&1", shell=True, cwd=self.cwd, env=self.env, preexec_fn=os.setsid, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         fcntl.fcntl(p.stdout.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
-        pl = select.poll()
-        pl.register(p.stdout)
+        if 'poll' in dir(select):
+            pl = select.poll()
+            pl.register(p.stdout)
+        else:
+            pl = None
+            # kq = select.kevent(p.stdout.fileno(),filter=select.KQ_FILTER_READ)
         self.processPid = p.pid
         self.lock.release()
         retval = None
         out = ''
         while True:
             try:
-                plr = pl.poll(100)
-                if len(plr) == 0:
-                    outread = ''
-                else:
-                    plr = plr[0][1]
-                    if plr & select.POLLIN:
-                        outread = p.stdout.read()
-                    else:
+                canWrite = False
+                if pl != None:
+                    plr = pl.poll(100)
+                    if len(plr) == 0:
                         outread = ''
-                if len(outread) == 0 and (type(plr) == list or (plr & select.POLLOUT)):
+                    else:
+                        plr = plr[0][1]
+                        if plr & select.POLLIN:
+                            outread = p.stdout.read()
+                        else:
+                            outread = ''
+                    canWrite = (type(plr) == list or (pl != None and plr & select.POLLOUT))
+                else:
+                    try:
+                        outread = p.stdout.read()
+                    except IOError:
+                        outread = ''
+                    canWrite = True
+                if len(outread) == 0 and canWrite:
                     wr = self.getWrite()
                     if wr != None:
                         p.stdin.flush()
@@ -116,7 +129,7 @@ class ShellAsyncOutput(threading.Thread):
                         self.lock.acquire()
                         self.waitingForInput = True
                         self.lock.release()
-                        time.sleep(0.1)
+                        time.sleep(0.01)
                 else:
                     self.lock.acquire()
                     self.waitingForInput = False
@@ -127,9 +140,17 @@ class ShellAsyncOutput(threading.Thread):
                         lines = out[:-1]
                         out = out[-1]
                         self.extend(lines)
+                    if len(out) > 0:
+                        while len(self.output) > 0:
+                            time.sleep(0.01)
+                        self.extendrem(out)
+                        self.lock.acquire()
+                        self.waitingForInput = True
+                        self.lock.release()
             except IOError:
-                time.sleep(0.1)
-        pl.unregister(p.stdout)
+                time.sleep(0.01)
+        if pl != None:
+            pl.unregister(p.stdout)
         if len(out) > 0:
             while out.find("\n") != -1:
                 out = out.split("\n")
