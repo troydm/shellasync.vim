@@ -89,7 +89,7 @@ class ShellAsyncOutput(threading.Thread):
             try:
                 canWrite = False
                 if pl != None:
-                    plr = pl.poll(100)
+                    plr = pl.poll(50)
                     if len(plr) == 0:
                         outread = ''
                     else:
