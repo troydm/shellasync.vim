@@ -263,8 +263,11 @@ class ShellAsyncTerminal:
     def __init__(self):
         self.cwd = vim.eval('getcwd()')
         self.env = dict(os.environ)
+        self.pid = None
         self.history = []
         self.historyind = -1
+        self.sendhistory = []
+        self.sendhistoryind = -1
 
     def historyup(self):
         if len(self.history) == 0:
@@ -292,7 +295,48 @@ class ShellAsyncTerminal:
             self.historyind = -1
         return ""
 
+    def sendhistoryup(self):
+        if len(self.sendhistory) == 0:
+            return ""
+        if self.sendhistoryind == -1:
+            self.sendhistoryind = len(self.sendhistory)-1
+        else:
+            self.sendhistoryind -= 1
+        if self.sendhistoryind in xrange(len(self.sendhistory)):
+            return self.sendhistory[self.sendhistoryind]
+        else:
+            self.sendhistoryind = -1
+        return ""
+
+    def sendhistorydown(self):
+        if len(self.sendhistory) == 0:
+            return ""
+        if self.sendhistoryind == -1:
+            self.sendhistoryind = 0
+        else:
+            self.sendhistoryind += 1
+        if self.sendhistoryind in xrange(len(self.sendhistory)):
+            return self.sendhistory[self.sendhistoryind]
+        else:
+            self.sendhistoryind = -1
+        return ""
+
+    def send(self):
+        if self.pid != None:
+            command = vim.eval('send_input')
+            if len(command) > 0:
+                if len(self.sendhistory) > 0:
+                    if self.sendhistory[-1] != command:
+                        self.sendhistory.append(command)
+                else:
+                    self.sendhistory.append(command)
+            self.sendhistoryind = -1
+            ShellAsyncSendCmd(self.pid)
+
     def execute(self):
+        self.sendhistory = []
+        self.sendhistoryind = -1
+        self.pid = None
         command = vim.eval('command')
         if len(self.history) > 0:
             if self.history[-1] != command:
@@ -315,7 +359,7 @@ class ShellAsyncTerminal:
                     self.cwd = pwd[-2]
                 self.commandFinished()
             else:
-                ShellAsyncExecuteCmd(False,self.env)
+                self.pid = ShellAsyncExecuteCmd(False,self.env)
         elif command.startswith("setenv") or command.startswith("export"):
             command = command[7:]
             i = 0
@@ -379,12 +423,15 @@ class ShellAsyncTerminal:
         elif command == "exit":
             vim.command(":bd!")
         else:
-            ShellAsyncExecuteCmd(False,self.env)
+            self.pid = ShellAsyncExecuteCmd(False,self.env)
 
     def commandAppend(self,line):
         vim.current.buffer.append(line)
 
     def commandFinished(self):
+        self.sendhistory = []
+        self.sendhistoryind = -1
+        self.pid = None
         vim.current.buffer.append("")
         vim.eval("setbufvar('%','pl',"+str(len(vim.current.buffer))+")")
         vim.eval("setbufvar('%','cfinished',1)")
@@ -473,6 +520,7 @@ def ShellAsyncExecuteCmd(clear,enviroment):
     if pid != None:
         vim.eval("setbufvar('%','pid',"+str(pid)+")")
         shellasync_cmds[pid] = out
+    return pid
 
 def ShellAsyncTermCmd(pid):
     global shellasync_cmds
@@ -866,8 +914,14 @@ function! s:TerminalGetCommand()
     return ln
 endfunction
 function! s:TerminalSetCommand(command)
-    let pl = getbufvar('%','pl')
-    call setline(pl,eval(g:shellasync_terminal_prompt).a:command.' ')
+    let cfinished = getbufvar('%','cfinished')
+    if cfinished == 0
+        let pl = line('$')
+    else
+        let pl = getbufvar('%','pl')
+    endif
+    let prompt = s:GetTerminalPrompt()[:-2]
+    call setline(pl,prompt.a:command.' ')
     normal! $
 endfunction
 function! s:TerminalBackspacePressed()
@@ -894,14 +948,24 @@ function! s:TerminalRightPressed()
     startinsert
 endfunction
 function! s:TerminalUpPressed()
+    let cfinished = getbufvar('%','cfinished')
     let termnr = getbufvar('%','termnr')
-    let command = pyeval('shellasync_terms['.termnr.'].historyup()')
+    if cfinished == 0
+        let command = pyeval('shellasync_terms['.termnr.'].sendhistoryup()')
+    else
+        let command = pyeval('shellasync_terms['.termnr.'].historyup()')
+    endif
     call s:TerminalSetCommand(command)
     startinsert
 endfunction
 function! s:TerminalDownPressed()
+    let cfinished = getbufvar('%','cfinished')
     let termnr = getbufvar('%','termnr')
-    let command = pyeval('shellasync_terms['.termnr.'].historydown()')
+    if cfinished == 0
+        let command = pyeval('shellasync_terms['.termnr.'].sendhistorydown()')
+    else
+        let command = pyeval('shellasync_terms['.termnr.'].historydown()')
+    endif
     call s:TerminalSetCommand(command)
     startinsert
 endfunction
@@ -909,8 +973,12 @@ function! s:TerminalEnterPressed()
     let cfinished = getbufvar('%','cfinished')
     let command = s:TerminalGetCommand()
     if cfinished == 0
-        let command = s:TerminalGetCommand()
-        call s:SendShellInput(getbufvar('%','pid'),command)
+        let termnr = getbufvar('%','termnr')
+        let send_input = command
+        if len(send_input) == 0
+            let send_input = ''
+        endif
+        exe 'python shellasync_terms['.termnr.'].send()'
         return
     endif
     if empty(command)
