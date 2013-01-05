@@ -1,2 +1,4 @@
 .Apple*
 .DS_Store*
+doc/tags
+**.pyc
