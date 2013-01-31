@@ -12,9 +12,36 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
+" check if running on windows {{{
+if has("win32") || has("win64")
+    let &cpo = s:save_cpo
+    unlet s:save_cpo
+    if exists("g:shellasync_suppress_load_warning") && g:shellasync_suppress_load_warning
+        finish
+    endif
+    echo "shellasync won't work windows operating system"
+    finish
+endif
+" }}}
+
 " check python support {{{
 if !has("python")
-    echo "ShellAsync needs vim compiled with +python option"
+    let &cpo = s:save_cpo
+    unlet s:save_cpo
+    if exists("g:shellasync_suppress_load_warning") && g:shellasync_suppress_load_warning
+        finish
+    endif
+    echo "shellasync needs vim compiled with +python option"
+    finish
+endif
+
+if !exists('*pyeval')
+    let &cpo = s:save_cpo
+    unlet s:save_cpo
+    if exists("g:shellasync_suppress_load_warning") && g:shellasync_suppress_load_warning
+        finish
+    endif
+    echo "shellasync needs vim 7.3 with atleast 569 patchset included"
     finish
 endif
 " }}}

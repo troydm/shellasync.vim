@@ -25,6 +25,7 @@ class ShellAsyncOutput(threading.Thread):
         self.output = []
         self.outputrem = False
         self.outputremc = False
+        self.newdata = False
         self.input = []
         self.waitingForInput = False
         self.remainder = ''
@@ -70,11 +71,14 @@ class ShellAsyncOutput(threading.Thread):
                         outread = ''
                     else:
                         plr = plr[0][1]
-                        if plr & select.POLLIN:
-                            outread = p.stdout.read()
-                        else:
+                        try:
+                            if plr & select.POLLIN or plr & select.POLLPRI:
+                                outread = p.stdout.read()
+                            else:
+                                outread = ''
+                        except IOError:
                             outread = ''
-                    canWrite = (type(plr) == list or (pl != None and plr & select.POLLOUT))
+                    canWrite = type(plr) == list or (pl != None and (plr & select.POLLOUT) > 0)
                 else:
                     try:
                         outread = p.stdout.read()
@@ -84,12 +88,12 @@ class ShellAsyncOutput(threading.Thread):
                 if len(outread) == 0 and canWrite:
                     wr = self.getWrite()
                     if wr != None:
-                        p.stdin.flush()
-                        for w in wr:
-                            w = w+"\n"
-                            p.stdin.write(w)
-                            outread += w
-                        p.stdin.flush()
+                        if wr == "\x04":
+                            p.stdin.close()
+                        else:
+                            p.stdin.write(wr)
+                            p.stdin.flush()
+                            outread += wr
                         time.sleep(0.001)
                 if len(outread) == 0:
                     retval = p.poll()
@@ -117,8 +121,6 @@ class ShellAsyncOutput(threading.Thread):
                         out = out[-1]
                         self.extend(lines)
                     if len(out) > 0:
-                        while len(self.output) > 0:
-                            time.sleep(0.01)
                         self.extendrem(out)
                         self.lock.acquire()
                         self.waitingForInput = True
@@ -155,13 +157,14 @@ class ShellAsyncOutput(threading.Thread):
         if self.waitingForInput:
             ret = self.remainder
         else:
-            ret = None 
+            ret = '' 
         self.lock.release()
         return ret
 
     def get(self):
         r = None
         self.lock.acquire()
+        self.newdata = False
         if len(self.output) > 0:
             r = (self.outputrem, self.outputremc, self.output)
             self.outputremc = False
@@ -175,8 +178,15 @@ class ShellAsyncOutput(threading.Thread):
         self.lock.release()
         return r
 
+    def hasnewdata(self):
+        self.lock.acquire()
+        r = self.newdata
+        self.lock.release()
+        return r
+
     def extend(self,data):
         self.lock.acquire()
+        self.newdata = True
         if self.outputrem:
             self.output = []
         self.outputremc = self.outputrem or self.outputremc
@@ -219,6 +229,16 @@ class ShellAsyncOutput(threading.Thread):
     def write(self,data):
         if data == None:
             return
+        if type(data) == list:
+            for i in xrange(len(data)):
+                data[i] += "\n"
+        else:
+            data += "\n"
+        self.writenonl(data)
+
+    def writenonl(self,data):
+        if data == None:
+            return
         self.lock.acquire()
         if type(data) == list:
             self.input.extend(data)
@@ -230,8 +250,7 @@ class ShellAsyncOutput(threading.Thread):
         out = None
         self.lock.acquire()
         if len(self.input) > 0:
-            out = [self.input[0]]
-            self.input = self.input[1:]
+            out = self.input.pop(0)
         self.lock.release()
         return out
 
@@ -297,7 +316,7 @@ class ShellAsyncTerminal:
             self.sendhistoryind = -1
         return ""
 
-    def send(self):
+    def send(self,nl):
         if self.pid != None:
             command = vim.eval('send_input')
             if len(command) > 0:
@@ -307,7 +326,7 @@ class ShellAsyncTerminal:
                 else:
                     self.sendhistory.append(command)
             self.sendhistoryind = -1
-            ShellAsyncSendCmd(self.pid)
+            ShellAsyncSendCmd(self.pid,nl)
 
     def execute(self):
         self.sendhistory = []
@@ -414,41 +433,83 @@ class ShellAsyncTerminal:
         vim.command("call shellasync#RefreshShellTerminal()")
         vim.command("startinsert")
 
+def ShellAsyncRefreshOutputFetch(output):
+    switchbackint = 0
+    while True:
+        out = output.get()
+        if out != None:
+            rem = out[0]
+            remc = out[1]
+            out = out[2]
+            if rem:
+                remc = remc and len(vim.current.buffer) != 1
+                if remc:
+                    vim.current.buffer.append(out)
+                    vim.command("normal! G0")
+                switchbackwnr = vim.eval("getbufvar('%','switchbackwnr')")
+                if switchbackwnr != None:
+                    if switchbackint > 9:
+                        if output.isWaitingForInput():
+                            vim.command("unlet b:switchbackwnr")
+                            vim.command(str(switchbackwnr)+"wincmd w")
+                            break
+                    else:
+                        time.sleep(0.001)
+                        switchbackint += 1
+                        continue
+                if remc and int(vim.eval("&filetype == 'shellasyncterm'")) == 1:
+                    vim.command("startinsert")
+                break
+            else:
+                if remc and len(vim.current.buffer) > 1:
+                    if out[0].rstrip().find(vim.current.buffer[-1].rstrip()) == 0:
+                        vim.current.buffer[-1] = None
+                if len(vim.current.buffer) == 1 and len(vim.current.buffer[0]) == 0:
+                    vim.current.buffer[0] = out[0]
+                    out = out[1:]
+                    if len(out) > 0:
+                        vim.current.buffer.append(out)
+                else:
+                    vim.current.buffer.append(out)
+                vim.command("normal! G0")
+                time.sleep(0.001)
+                switchbackint = 0
+        else:
+            break
+
 def ShellAsyncRefreshOutput():
     global shellasync_cmds
     pid = vim.eval("getbufvar('%','pid')")
     if pid == None:
-        return
+        return 
     pid = int(pid)
     if pid in shellasync_cmds:
         output = shellasync_cmds[pid]
         if output != None:
-            out = output.get()
-            if out != None:
-                rem = out[0]
-                remc = out[1]
-                out = out[2]
-                if rem:
-                    if remc and len(vim.current.buffer) != 1:
-                        vim.current.buffer.append(out)
-                        vim.command("call setpos('.',["+str(vim.current.buffer.number)+","+str(len(vim.current.buffer))+",0,0])")
-                    switchbackwnr = vim.eval("getbufvar('%','switchbackwnr')")
-                    if switchbackwnr != None:
-                        if output.isWaitingForInput():
-                            vim.command("unlet b:switchbackwnr")
-                            vim.command(str(switchbackwnr)+"wincmd w")
-                else:
-                    if remc and len(vim.current.buffer) > 1:
-                        vim.current.buffer[len(vim.current.buffer)-1] = None
-                    if len(vim.current.buffer) == 1 and len(vim.current.buffer[0]) == 0:
-                        vim.current.buffer[0] = out[0]
-                        out = out[1:]
-                        if len(out) > 0:
-                            vim.current.buffer.append(out)
-                    else:
-                        vim.current.buffer.append(out)
-                    vim.command("call setpos('.',["+str(vim.current.buffer.number)+","+str(len(vim.current.buffer))+",0,0])")
-    vim.command("call feedkeys(\"f\e\")")
+            ShellAsyncRefreshOutputFetch(output)
+    vim.command("call feedkeys(\"f\e\",'n')")
+
+def ShellAsyncRefreshOutputI():
+    global shellasync_cmds
+    pid = vim.eval("getbufvar('%','pid')")
+    if pid == None:
+        return 
+    pid = int(pid)
+    if pid in shellasync_cmds:
+        output = shellasync_cmds[pid]
+        if output != None:
+            if output.hasnewdata():
+                vim.command('stopinsert')
+                return
+    linelen = int(vim.eval("col('$')-1"))
+    if linelen > 0:
+        if int(vim.eval("col('.')")) == 1:
+            vim.command("call feedkeys(\"\<Right>\<Left>\",'n')")
+        else:
+            vim.command("call feedkeys(\"\<Left>\<Right>\",'n')")
+    else:
+        vim.command("call feedkeys(\"\ei\",'n')")
+
 
 def ShellAsyncTerminalRefreshOutput():
     global shellasync_cmds
@@ -477,6 +538,16 @@ def ShellAsyncTerminalRefreshOutput():
         vim.command("call shellasync#RefreshShellTerminal()")
         vim.command("call feedkeys(\"i\")")
 
+def ShellAsyncTerminalRefreshOutputI():
+    global shellasync_cmds
+    cfinished = vim.eval("getbufvar('%','cfinished')")
+    if cfinished == None:
+        return
+    cfinished = int(cfinished)
+    if cfinished == 1:
+        return
+    ShellAsyncRefreshOutputI()
+
 def ShellAsyncExecuteCmd(clear,enviroment):
     global shellasync_cmds
     print_retval = vim.eval("g:shellasync_print_return_value") == '1'
@@ -498,12 +569,16 @@ def ShellAsyncExecuteCmd(clear,enviroment):
         shellasync_cmds[pid] = out
     return pid
 
+def ShellAsyncEchoMessage(message):
+    message = message.replace('"','\\"')
+    vim.command("echomsg \""+message+"\"")
+
 def ShellAsyncTermCmd(pid):
     global shellasync_cmds
     if pid in shellasync_cmds:
         out = shellasync_cmds[pid]
         if not out.isAlive():
-            vim.command("echomsg 'shell command "+out.processCommand()+" pid: "+str(pid)+" is finished'")
+            ShellAsyncEchoMessage("shell command "+out.processCommand()+" pid: "+str(pid)+" is finished")
             return True
         try:
             os.killpg(pid,signal.SIGTERM)
@@ -511,10 +586,10 @@ def ShellAsyncTermCmd(pid):
             os.kill(pid,signal.SIGTERM)
         out.join(15.0)
         if out.isAlive():
-            vim.command("echomsg 'shell command "+out.processCommand()+" pid: "+str(pid)+" is still running'")
+            ShellAsyncEchoMessage("shell command "+out.processCommand()+" pid: "+str(pid)+" is still running")
             return False
         else:
-            vim.command("echomsg 'shell command "+out.processCommand()+" pid: "+str(pid)+" terminated'")
+            ShellAsyncEchoMessage("shell command "+out.processCommand()+" pid: "+str(pid)+" terminated")
     return True
 
 def ShellAsyncKillCmd(pid):
@@ -522,7 +597,7 @@ def ShellAsyncKillCmd(pid):
     if pid in shellasync_cmds:
         out = shellasync_cmds[pid]
         if not out.isAlive():
-            vim.command("echomsg 'shell command "+out.processCommand()+" pid: "+str(pid)+" is finished'")
+            ShellAsyncEchoMessage("shell command "+out.processCommand()+" pid: "+str(pid)+" is finished")
             return True
         try:
             os.killpg(pid,signal.SIGKILL)
@@ -530,10 +605,10 @@ def ShellAsyncKillCmd(pid):
             os.kill(pid,signal.SIGKILL)
         out.join(15.0)
         if out.isAlive():
-            vim.command("echomsg 'shell command "+out.processCommand()+" pid: "+str(pid)+" is still running'")
+            ShellAsyncEchoMessage("shell command "+out.processCommand()+" pid: "+str(pid)+" is still running")
             return False
         else:
-            vim.command("echomsg 'shell command "+out.processCommand()+" pid: "+str(pid)+" killed'")
+            ShellAsyncEchoMessage("shell command "+out.processCommand()+" pid: "+str(pid)+" killed")
     return True
 
 def ShellAsyncDeleteCmd(pid):
@@ -542,10 +617,10 @@ def ShellAsyncDeleteCmd(pid):
         out = shellasync_cmds[pid]
         if not out.isAlive():
             shellasync_cmds.pop(pid)
-            vim.command("echomsg 'shell command "+out.processCommand()+" pid: "+str(pid)+" deleted'")
+            ShellAsyncEchoMessage("shell command "+out.processCommand()+" pid: "+str(pid)+" deleted")
             return True
         else:
-            vim.command("echomsg 'shell command "+out.processCommand()+" pid: "+str(pid)+" is still running'")
+            ShellAsyncEchoMessage("shell command "+out.processCommand()+" pid: "+str(pid)+" is still running")
             return False
     return True
 
@@ -555,16 +630,19 @@ def ShellAsyncShellRunning(pid):
         return shellasync_cmds[pid].isRunning()
     return False
 
-def ShellAsyncSendCmd(pid):
+def ShellAsyncSendCmd(pid,nl):
     global shellasync_cmds
     input = vim.eval('send_input')
     if pid in shellasync_cmds:
         out = shellasync_cmds[pid]
         if not out.isAlive():
-            vim.command("echomsg 'shell command "+out.processCommand()+" pid: "+str(pid)+" is finished'")
+            ShellAsyncEchoMessage("shell command "+out.processCommand()+" pid: "+str(pid)+" is finished")
             return False
         else:
-            out.write(input)
+            if nl:
+                out.write(input)
+            else:
+                out.writenonl(input)
             return True
     return False
 

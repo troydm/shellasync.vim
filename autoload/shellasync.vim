@@ -13,9 +13,7 @@ let s:save_cpo = &cpo
 set cpo&vim
 
 " check if already loaded {{{
-if !exists('g:shellasync_loaded')
-    let g:shellasync_loaded = 1
-elseif g:shellasync_loaded
+if exists('g:shellasync_loaded') && g:shellasync_loaded
     let &cpo = s:save_cpo
     unlet s:save_cpo
     finish
@@ -35,6 +33,8 @@ import shellasync
 EOF
 " }}}
 
+" functions {{{
+" utility functions {{{
 function! s:ShellWindow(pid)
     for wnr in range(1,winnr('$'))
         let bnr = winbufnr(wnr)
@@ -47,9 +47,18 @@ function! s:ShellWindow(pid)
     endfor
     return -1
 endfunction
+
 function! s:ExpandCommand(command)
     return join(map(split(a:command), 'expand(v:val)'))
 endfunction
+
+function! s:ShellPidCompletion(ArgLead, CmdLine, CursorPos)
+    let pidlist = pyeval("filter(shellasync.ShellAsyncShellRunning,shellasync.shellasync_cmds.keys())")
+    return map(filter(pidlist,"v:val =~ \'^".a:ArgLead."\'"),"\'\'.v:val")
+endfunction
+" }}}
+
+" shell functions {{{
 function! s:TermShellInBuf(del)
     let pid = getbufvar('%','pid')
     if pid != ''
@@ -59,6 +68,7 @@ function! s:TermShellInBuf(del)
         endif
     endif
 endfunction
+
 function! s:SelectShell(pidlist)
     if len(a:pidlist) > 0
         let pid = a:pidlist[0]
@@ -83,14 +93,15 @@ function! s:SelectShell(pidlist)
         echo 'please select shell'
     endif
 endfunction
-function! s:SendShellInput(pid,input_data)
+
+function! s:SendShellInput(pid,input_data,nl)
     let send_input = a:input_data
     if len(send_input) == 0
         let send_input = ''
     endif
     redraw!
     if pyeval('shellasync.ShellAsyncShellRunning('.a:pid.')')
-        exe 'python shellasync.ShellAsyncSendCmd('.a:pid.')'
+        exe 'python shellasync.ShellAsyncSendCmd('.a:pid.','.a:nl.')'
         let wnr = s:ShellWindow(a:pid)
         if wnr != -1 && winnr() != wnr
             let bnr = winbufnr(wnr)
@@ -102,6 +113,7 @@ function! s:SendShellInput(pid,input_data)
         echo 'shell '.a:pid.' is not running'
     endif
 endfunction
+
 function! s:CmdShell(cmd, pidlist)
     if len(a:pidlist) == 0
         echo 'please specify a pid or associate a pid with current buffer using ShellSelect'
@@ -111,15 +123,25 @@ function! s:CmdShell(cmd, pidlist)
         endfor
     endif
 endfunction
+" }}}
+
+" terminal functions {{{
 function! s:GetTerminalPrompt()
     let cfinished = getbufvar('%','cfinished')
     if cfinished == 0
         let pid = getbufvar('%','pid')
-        return pyeval('shellasync.shellasync_cmds['.pid.'].getRemainder()').' '
+        let prompt = pyeval('shellasync.shellasync_cmds['.pid.'].getRemainder()').' '
+        if len(prompt) > 0
+            let b:prompt = prompt
+        else
+            let prompt = b:prompt
+        endif
+        return prompt
     else
         return eval(g:shellasync_terminal_prompt).' '
     endif
 endfunction
+
 function! s:TerminalStartInsert()
     let cfinished = getbufvar('%','cfinished')
     let pos = getpos('.')
@@ -137,6 +159,7 @@ function! s:TerminalStartInsert()
     endif
     call setpos('.',pos)
 endfunction
+
 function! s:TerminalGetCommand()
     let cfinished = getbufvar('%','cfinished')
     if cfinished == 0
@@ -149,6 +172,7 @@ function! s:TerminalGetCommand()
     let ln = ln[len(prompt)-1: len(ln)-2]
     return ln
 endfunction
+
 function! s:TerminalSetCommand(command)
     let cfinished = getbufvar('%','cfinished')
     if cfinished == 0
@@ -160,6 +184,16 @@ function! s:TerminalSetCommand(command)
     call setline(pl,prompt.a:command.' ')
     normal! $
 endfunction
+
+function! s:TerminalCtrlDPressed()
+    let cfinished = getbufvar('%','cfinished')
+    if cfinished == 0
+        call s:SendShellInput(b:pid,"\x04",0)
+    else
+        bd!
+    endif
+endfunction
+
 function! s:TerminalBackspacePressed()
     let prompt = s:GetTerminalPrompt()
     if col('.') >= len(prompt)
@@ -169,6 +203,7 @@ function! s:TerminalBackspacePressed()
     endif
     startinsert
 endfunction
+
 function! s:TerminalLeftPressed()
     let prompt = s:GetTerminalPrompt()
     if col('.') < len(prompt)
@@ -176,6 +211,7 @@ function! s:TerminalLeftPressed()
     endif
     startinsert
 endfunction
+
 function! s:TerminalRightPressed()
     normal! l
     if col('.') != (col('$')-1)
@@ -183,6 +219,7 @@ function! s:TerminalRightPressed()
     endif
     startinsert
 endfunction
+
 function! s:TerminalUpPressed()
     let cfinished = getbufvar('%','cfinished')
     let termnr = getbufvar('%','termnr')
@@ -194,6 +231,7 @@ function! s:TerminalUpPressed()
     call s:TerminalSetCommand(command)
     startinsert
 endfunction
+
 function! s:TerminalDownPressed()
     let cfinished = getbufvar('%','cfinished')
     let termnr = getbufvar('%','termnr')
@@ -205,6 +243,7 @@ function! s:TerminalDownPressed()
     call s:TerminalSetCommand(command)
     startinsert
 endfunction
+
 function! s:TerminalEnterPressed()
     let cfinished = getbufvar('%','cfinished')
     let command = s:TerminalGetCommand()
@@ -214,7 +253,7 @@ function! s:TerminalEnterPressed()
         if len(send_input) == 0
             let send_input = ''
         endif
-        exe 'python shellasync.shellasync_terms['.termnr.'].send()'
+        exe 'python shellasync.shellasync_terms['.termnr.'].send(1)'
         return
     endif
     if empty(command)
@@ -236,22 +275,18 @@ function! s:TerminalEnterPressed()
         python shellasync.ShellAsyncTerminalRefreshOutput()
     endif
 endfunction
+
 function! s:TerminalBufEnter()
     if g:shellasync_terminal_insert_on_enter
-        if b:cfinished
-            startinsert
-        else
-            normal! G
-        endif
+        normal! G0
+        startinsert
     endif
 endfunction
+
 function! s:CloseShellTerminal()
     call s:TermShellInBuf(1)
 endfunction
-function! s:ShellPidCompletion(ArgLead, CmdLine, CursorPos)
-    let pidlist = pyeval("filter(shellasync.ShellAsyncShellRunning,shellasync.shellasync_cmds.keys())")
-    return map(filter(pidlist,"v:val =~ \'^".a:ArgLead."\'"),"\'\'.v:val")
-endfunction
+" }}}
 
 " global functions {{{
 function! shellasync#ExecuteInShell(bang, samewin, command)
@@ -286,6 +321,7 @@ function! shellasync#ExecuteInShell(bang, samewin, command)
         exe 'au BufEnter <buffer> set updatetime='.g:shellasync_update_interval
         au BufLeave <buffer> let &updatetime=getbufvar('%','prevupdatetime')
         au CursorHold <buffer> python shellasync.ShellAsyncRefreshOutput()
+        au CursorHoldI <buffer> python shellasync.ShellAsyncRefreshOutputI()
         nnoremap <buffer> <C-c> :echo '' \| call <SID>TermShellInBuf(0)<CR>
         python shellasync.ShellAsyncExecuteCmd(True,os.environ)
     else
@@ -340,7 +376,7 @@ function! shellasync#SendShell(c,l1,l2,pidlist)
         let send_input = input('send input: ')
         echo ''
     endif
-    call s:SendShellInput(a:pidlist[0],send_input)
+    call s:SendShellInput(a:pidlist[0],send_input,1)
 endfunction
 
 function! shellasync#ShellSelect(...)
@@ -427,12 +463,14 @@ function! shellasync#OpenShellTerminal()
     au BufLeave <buffer> let &updatetime=getbufvar('%','prevupdatetime') | stopinsert
     au InsertEnter <buffer> call <SID>TerminalStartInsert()
     au CursorHold <buffer> python shellasync.ShellAsyncTerminalRefreshOutput()
+    au CursorHoldI <buffer> python shellasync.ShellAsyncTerminalRefreshOutputI()
     inoremap <silent> <buffer> <Enter> <ESC>:call <SID>TerminalEnterPressed() \| normal! 0<CR>
     inoremap <silent> <buffer> <Left> <ESC>:call <SID>TerminalLeftPressed()<CR>
     inoremap <silent> <buffer> <Right> <ESC>:call <SID>TerminalRightPressed()<CR>
     inoremap <silent> <buffer> <Up> <ESC>:call <SID>TerminalUpPressed()<CR>
     inoremap <silent> <buffer> <Down> <ESC>:call <SID>TerminalDownPressed()<CR>
     inoremap <silent> <buffer> <BS> <ESC>:call <SID>TerminalBackspacePressed()<CR>
+    inoremap <silent> <buffer> <C-d> <ESC>:call <SID>TerminalCtrlDPressed()<CR>
     nnoremap <silent> <buffer> <C-c> :call shellasync#TermShell([getbufvar('%','pid')])<CR>
     nnoremap <silent> <buffer> t :call shellasync#TermShell([getbufvar('%','pid')])<CR>
     nnoremap <silent> <buffer> K :call shellasync#KillShell([getbufvar('%','pid')])<CR>
@@ -448,6 +486,7 @@ function! shellasync#RefreshShellTerminal()
     endif
     redraw!
 endfunction
+" }}}
 " }}}
 
 let &cpo = s:save_cpo
