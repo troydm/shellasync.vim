@@ -138,7 +138,7 @@ class ShellAsyncOutput(threading.Thread):
             if len(out) > 0:
                 self.extend([out])
         if self.print_retval:
-            self.extend(["","Shell command "+self.command+" completed with return value "+str(retval)])
+            self.extend(["","Shell command "+self.command+" completed with exit status "+str(retval)])
 
     def isRunning(self):
         self.lock.acquire()
@@ -480,7 +480,7 @@ def ShellAsyncRefreshOutputFetch(output):
 def ShellAsyncRefreshOutput():
     global shellasync_cmds
     pid = vim.eval("getbufvar('%','pid')")
-    if pid == None:
+    if pid == None or pid == '':
         return 
     pid = int(pid)
     if pid in shellasync_cmds:
@@ -492,7 +492,7 @@ def ShellAsyncRefreshOutput():
 def ShellAsyncRefreshOutputI():
     global shellasync_cmds
     pid = vim.eval("getbufvar('%','pid')")
-    if pid == None:
+    if pid == None or pid == '':
         return 
     pid = int(pid)
     if pid in shellasync_cmds:
@@ -514,14 +514,14 @@ def ShellAsyncRefreshOutputI():
 def ShellAsyncTerminalRefreshOutput():
     global shellasync_cmds
     cfinished = vim.eval("getbufvar('%','cfinished')")
-    if cfinished == None:
+    if cfinished == None or cfinished == '':
         return
     cfinished = int(cfinished)
     if cfinished == 1:
         return
     ShellAsyncRefreshOutput()
     pid = vim.eval("getbufvar('%','pid')")
-    if pid == None:
+    if pid == None or pid == '':
         return
     pid = int(pid)
     if pid in shellasync_cmds:
@@ -541,7 +541,7 @@ def ShellAsyncTerminalRefreshOutput():
 def ShellAsyncTerminalRefreshOutputI():
     global shellasync_cmds
     cfinished = vim.eval("getbufvar('%','cfinished')")
-    if cfinished == None:
+    if cfinished == None or cfinished == '':
         return
     cfinished = int(cfinished)
     if cfinished == 1:
@@ -554,7 +554,7 @@ def ShellAsyncExecuteCmd(clear,enviroment):
     cmd = vim.eval("command")
     cwd = vim.eval("cwd")
     pid = vim.eval("getbufvar('%','pid')")
-    if pid != None:
+    if pid != None and pid != '':
         pid = int(pid)
         ShellAsyncTermCmd(pid)
         ShellAsyncRefreshOutput()
@@ -667,7 +667,7 @@ def ShellAsyncListShells():
     selectbnr = vim.eval("getbufvar('%','selectbnr')")
     vim.current.buffer[:] = None
     title='shellasync - list of running processes (press t to terminate, K to kill, d to delete, s to send input' 
-    if selectbnr != None:
+    if selectbnr != None and selectbnr != '':
         vim.current.buffer[0]=title+', S to select shell)'
     else:
         vim.current.buffer[0]=title+')'
