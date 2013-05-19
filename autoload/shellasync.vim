@@ -158,6 +158,8 @@ function! s:TerminalStartInsert()
         let pos[2] = col([pos[1],'$'])-1
     endif
     call setpos('.',pos)
+    " set to override restoration of cursor to previous position
+    let v:char = '.'
 endfunction
 
 function! s:TerminalGetCommand()
