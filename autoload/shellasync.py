@@ -42,9 +42,9 @@ class ShellAsyncOutput(threading.Thread):
         pid = None
         while True:
             pid = self.pid()
-            if i >= 100 or pid != None:
+            if i >= 1000 or pid != None:
                 return pid
-            time.sleep(0.01)
+            time.sleep(0.001)
             i += 1
         return None
     
