@@ -447,10 +447,10 @@ def ShellAsyncRefreshOutputFetch(output):
                     vim.current.buffer.append(out)
                     vim.command("normal! G0")
                 switchbackwnr = vim.eval("getbufvar('%','switchbackwnr')")
-                if switchbackwnr != None:
+                if switchbackwnr != None and switchbackwnr != '':
                     if switchbackint > 9:
                         if output.isWaitingForInput():
-                            vim.command("unlet b:switchbackwnr")
+                            vim.command("unlet! b:switchbackwnr")
                             vim.command(str(switchbackwnr)+"wincmd w")
                             break
                     else:
