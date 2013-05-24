@@ -38,6 +38,7 @@ class ShellAsyncOutput(threading.Thread):
         self.print_retval = print_retval
         self.lock.release()
         self.start()
+        time.sleep(0.0000001)
         i = 0
         pid = None
         while True:
