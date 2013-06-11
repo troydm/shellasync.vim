@@ -27,7 +27,7 @@ python << EOF
 import vim, os, sys
 shellasync_path = vim.eval("expand('<sfile>:h')")
 if not shellasync_path in sys.path:
-    sys.path.append(shellasync_path)
+    sys.path.insert(0, shellasync_path)
 del shellasync_path 
 import shellasync
 EOF
