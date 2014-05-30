@@ -261,7 +261,7 @@ function! s:TerminalEnterPressed()
     if empty(command)
         startinsert
     elseif command =~ '^\s*clear\s*$' 
-        silent! normal! ggdGG
+        silent! normal! gg"_dG
         call setbufvar('%','pl',1)
         call shellasync#RefreshShellTerminal()
         startinsert
