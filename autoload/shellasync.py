@@ -7,7 +7,7 @@
 # License: Vim License (see :help license)
 # Website: https://github.com/troydm/shellasync.vim
 
-import vim, sys, os, select, subprocess, threading, signal, time, fcntl
+import vim, sys, os, re, select, subprocess, threading, signal, time, fcntl
 
 shellasync_cmds = {}
 shellasync_terms = {}
@@ -186,6 +186,12 @@ class ShellAsyncOutput(threading.Thread):
         return r
 
     def extend(self,data):
+        # remove ANSI escape sequences
+        for d in data:
+            if "\033" in d:
+                r = re.compile("\033\[\d*;?\d*[A-KST]")
+                data = map(lambda i: r.sub("",i), data)
+                break
         self.lock.acquire()
         self.newdata = True
         if self.outputrem:
@@ -196,6 +202,10 @@ class ShellAsyncOutput(threading.Thread):
         self.lock.release()
 
     def extendrem(self,data):
+        # remove ANSI escape sequences
+        if "\033" in data:
+            r = re.compile("\033\[\d*;?\d*[A-KST]")
+            data = r.sub("", data)
         self.lock.acquire()
         if len(self.output) > 0:
             self.lock.release()
