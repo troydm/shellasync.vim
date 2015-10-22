@@ -14,6 +14,9 @@ thread and non-blockingly get the output as the command executes
 
 Note: this plugin is highly experimental, so it might make your vim process unstable
 
+Bonus: this plugin has simple terminal emulator that is sufficient for most terminal related tasks, start it using :ShellTerminal command.
+       You can also start any programming language REPL in it and connect any vim buffer to directly send code from that buffer to REPL using :ShellSelect and :ShellSend commands.
+
 Platform: 
     only unix based operating systems are supported
 
