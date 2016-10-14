@@ -415,7 +415,7 @@ function! shellasync#OpenShellsList(selectbnr)
     let winnr = bufwinnr('^' . command . '$')
     if winnr < 0
         execute &lines/3 . 'sp ' . fnameescape(command)
-        setlocal buftype=nofile bufhidden=wipe nobuflisted noswapfile nowrap nonumber filetype=shellasynclist
+        setlocal buftype=nofile bufhidden=wipe nolist nobuflisted noswapfile nowrap nonumber filetype=shellasynclist
         call setbufvar("%","prevupdatetime",&updatetime)
         call setbufvar("%","command",command)
         exe 'set updatetime='.g:shellasync_update_interval
@@ -453,7 +453,7 @@ function! shellasync#OpenShellTerminal()
     endfor
     let termnr += 1
     execute 'belowright '.(&lines/3) . 'sp ' . fnameescape('shellasyncterm - '.termnr)
-    setlocal buftype=nofile bufhidden=wipe buflisted noswapfile nowrap nonumber filetype=shellasyncterm
+    setlocal buftype=nofile bufhidden=wipe buflisted nolist noswapfile nowrap nonumber filetype=shellasyncterm
     call setbufvar("%","prevupdatetime",&updatetime)
     call setbufvar("%","termnr",termnr)
     call setbufvar("%","pl",1)
