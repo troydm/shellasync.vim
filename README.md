@@ -17,11 +17,11 @@ Note: this plugin is highly experimental, so it might make your vim process unst
 Bonus: this plugin has simple terminal emulator that is sufficient for most terminal related tasks, start it using :ShellTerminal command.
        You can also start any programming language REPL in it and connect any vim buffer to directly send code from that buffer to REPL using :ShellSelect and :ShellSend commands.
 
-Platform: 
+Platform:
     only unix based operating systems are supported
 
-Requirements: 
-    vim 7.3 with atleast 569 patchset included and compiled with python support
+Requirements:
+    vim 7.3 with atleast 569 patchset included and compiled with python3 or python support
 
 Screenshot
 ----------

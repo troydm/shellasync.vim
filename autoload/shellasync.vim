@@ -1,9 +1,9 @@
 " shellasync.vim plugin for asynchronously executing shell commands in vim
 " Maintainer: Dmitry "troydm" Geurkov <d.geurkov@gmail.com>
-" Version: 0.3.7
+" Version: 0.3.8
 " Description: shellasync.vim plugin allows you to execute shell commands
 " asynchronously inside vim and see output in seperate buffer window.
-" Last Change: 31 January, 2013
+" Last Change: 10 November, 2020
 " License: Vim License (see :help license)
 " Website: https://github.com/troydm/shellasync.vim
 "
@@ -22,15 +22,60 @@ else
 endif
 " }}}
 
+" check if running on windows {{{
+if has("win32") || has("win64")
+    let &cpo = s:save_cpo
+    unlet s:save_cpo
+    if exists("g:shellasync_suppress_load_warning") && g:shellasync_suppress_load_warning
+        finish
+    endif
+    echo "shellasync won't work windows operating system"
+    finish
+endif
+" }}}
+
+" check python support {{{
+if !((!g:shellasync_use_python2 && has("python3")) || has("python"))
+    let &cpo = s:save_cpo
+    unlet s:save_cpo
+    if exists("g:shellasync_suppress_load_warning") && g:shellasync_suppress_load_warning
+        finish
+    endif
+    echo "shellasync needs vim compiled with +python3 or +python option"
+    finish
+endif
+
+if !exists('*pyxeval')
+    let &cpo = s:save_cpo
+    unlet s:save_cpo
+    if exists("g:shellasync_suppress_load_warning") && g:shellasync_suppress_load_warning
+        finish
+    endif
+    echo "shellasync needs vim 7.3 with atleast 569 patchset included"
+    finish
+endif
+" }}}
+
 " load python module {{{
-python << EOF
+if has('python3') && !g:shellasync_use_python2
+    python3 << EOF
 import vim, os, sys
-shellasync_path = vim.eval("expand('<sfile>:h')")
+shellasync_path = vim.eval("expand('<sfile>:h')") + '/py3'
 if not shellasync_path in sys.path:
     sys.path.insert(0, shellasync_path)
 del shellasync_path 
 import shellasync
 EOF
+else
+    python << EOF
+import vim, os, sys
+shellasync_path = vim.eval("expand('<sfile>:h')") + '/py2'
+if not shellasync_path in sys.path:
+    sys.path.insert(0, shellasync_path)
+del shellasync_path 
+import shellasync
+EOF
+endif
 " }}}
 
 " functions {{{
@@ -53,7 +98,7 @@ function! s:ExpandCommand(command)
 endfunction
 
 function! s:ShellPidCompletion(ArgLead, CmdLine, CursorPos)
-    let pidlist = pyeval("filter(shellasync.ShellAsyncShellRunning,shellasync.shellasync_cmds.keys())")
+    let pidlist = pyxeval("filter(shellasync.ShellAsyncShellRunning,shellasync.shellasync_cmds.keys())")
     return map(filter(pidlist,"v:val =~ \'^".a:ArgLead."\'"),"\'\'.v:val")
 endfunction
 " }}}
@@ -81,7 +126,7 @@ function! s:SelectShell(pidlist)
             else
                 unlet b:selectbnr
                 unlet b:selectbnrlist
-                python shellasync.ShellAsyncListShells()
+                pythonx shellasync.ShellAsyncListShells()
             endif
             let wnr = bufwinnr(selectbnr)
             if wnr != -1
@@ -100,8 +145,8 @@ function! s:SendShellInput(pid,input_data,nl)
         let send_input = ''
     endif
     redraw!
-    if pyeval('shellasync.ShellAsyncShellRunning('.a:pid.')')
-        exe 'python shellasync.ShellAsyncSendCmd('.a:pid.','.a:nl.')'
+    if pyxeval('shellasync.ShellAsyncShellRunning('.a:pid.')')
+        exe 'pythonx shellasync.ShellAsyncSendCmd('.a:pid.','.a:nl.')'
         let wnr = s:ShellWindow(a:pid)
         if wnr != -1 && winnr() != wnr
             let bnr = winbufnr(wnr)
@@ -119,7 +164,7 @@ function! s:CmdShell(cmd, pidlist)
         echo 'please specify a pid or associate a pid with current buffer using ShellSelect'
     else
         for pid in a:pidlist
-            exe 'python shellasync.'.a:cmd.'('.pid.')'
+            exe 'pythonx shellasync.'.a:cmd.'('.pid.')'
         endfor
     endif
 endfunction
@@ -130,7 +175,7 @@ function! s:GetTerminalPrompt()
     let cfinished = getbufvar('%','cfinished')
     if cfinished == 0
         let pid = getbufvar('%','pid')
-        let prompt = pyeval('shellasync.shellasync_cmds['.pid.'].getRemainder()').' '
+        let prompt = pyxeval('shellasync.shellasync_cmds['.pid.'].getRemainder()').' '
         if len(prompt) > 0
             let b:prompt = prompt
         else
@@ -226,9 +271,9 @@ function! s:TerminalUpPressed()
     let cfinished = getbufvar('%','cfinished')
     let termnr = getbufvar('%','termnr')
     if cfinished == 0
-        let command = pyeval('shellasync.shellasync_terms['.termnr.'].sendhistoryup()')
+        let command = pyxeval('shellasync.shellasync_terms['.termnr.'].sendhistoryup()')
     else
-        let command = pyeval('shellasync.shellasync_terms['.termnr.'].historyup()')
+        let command = pyxeval('shellasync.shellasync_terms['.termnr.'].historyup()')
     endif
     call s:TerminalSetCommand(command)
     startinsert
@@ -238,9 +283,9 @@ function! s:TerminalDownPressed()
     let cfinished = getbufvar('%','cfinished')
     let termnr = getbufvar('%','termnr')
     if cfinished == 0
-        let command = pyeval('shellasync.shellasync_terms['.termnr.'].sendhistorydown()')
+        let command = pyxeval('shellasync.shellasync_terms['.termnr.'].sendhistorydown()')
     else
-        let command = pyeval('shellasync.shellasync_terms['.termnr.'].historydown()')
+        let command = pyxeval('shellasync.shellasync_terms['.termnr.'].historydown()')
     endif
     call s:TerminalSetCommand(command)
     startinsert
@@ -255,7 +300,7 @@ function! s:TerminalEnterPressed()
         if len(send_input) == 0
             let send_input = ''
         endif
-        exe 'python shellasync.shellasync_terms['.termnr.'].send(1)'
+        exe 'pythonx shellasync.shellasync_terms['.termnr.'].send(1)'
         return
     endif
     if empty(command)
@@ -268,13 +313,13 @@ function! s:TerminalEnterPressed()
     else
         let termnr = getbufvar('%','termnr')
         let pid = getbufvar('%','pid')
-        let cwd = pyeval('shellasync.shellasync_terms['.termnr.'].cwd')
+        let cwd = pyxeval('shellasync.shellasync_terms['.termnr.'].cwd')
         if pid != ''
             silent! call shellasync#DeleteShell([pid])
         endif
         call setbufvar('%','cfinished',0)
-        exe 'python shellasync.shellasync_terms['.termnr.'].execute()'
-        python shellasync.ShellAsyncTerminalRefreshOutput()
+        exe 'pythonx shellasync.shellasync_terms['.termnr.'].execute()'
+        pythonx shellasync.ShellAsyncTerminalRefreshOutput()
     endif
 endfunction
 
@@ -322,13 +367,13 @@ function! shellasync#ExecuteInShell(bang, samewin, command)
         au BufWipeout <buffer> silent call <SID>TermShellInBuf(1)
         exe 'au BufEnter <buffer> set updatetime='.g:shellasync_update_interval
         au BufLeave <buffer> let &updatetime=getbufvar('%','prevupdatetime')
-        au CursorHold <buffer> python shellasync.ShellAsyncRefreshOutput()
-        au CursorHoldI <buffer> python shellasync.ShellAsyncRefreshOutputI()
+        au CursorHold <buffer> pythonx shellasync.ShellAsyncRefreshOutput()
+        au CursorHoldI <buffer> pythonx shellasync.ShellAsyncRefreshOutputI()
         nnoremap <buffer> <C-c> :echo '' \| call <SID>TermShellInBuf(0)<CR>
-        python shellasync.ShellAsyncExecuteCmd(True,os.environ)
+        pythonx shellasync.ShellAsyncExecuteCmd(True,os.environ)
     else
         exe winnr . 'wincmd w'
-        python shellasync.ShellAsyncExecuteCmd(True,os.environ)
+        pythonx shellasync.ShellAsyncExecuteCmd(True,os.environ)
     endif
 endfunction
 
@@ -387,7 +432,7 @@ function! shellasync#ShellSelect(...)
         call shellasync#OpenShellsList(bnr)
     else
         let pid = a:1
-        if pyeval('shellasync.ShellAsyncShellRunning('.pid.')')
+        if pyxeval('shellasync.ShellAsyncShellRunning('.pid.')')
             let b:pid = pid
             echo 'shell '.pid.' selected!'
         else
@@ -421,18 +466,18 @@ function! shellasync#OpenShellsList(selectbnr)
         exe 'set updatetime='.g:shellasync_update_interval
         exe 'au BufEnter <buffer> set updatetime='.g:shellasync_update_interval
         au BufLeave <buffer> let &updatetime=getbufvar('%','prevupdatetime')
-        au CursorHold <buffer> python shellasync.ShellAsyncListShells()
-        nnoremap <silent> <buffer> t :call shellasync#TermShell(shellasync#GetPidList()) \| python shellasync.ShellAsyncListShells()<CR>
-        nnoremap <silent> <buffer> K :call shellasync#KillShell(shellasync#GetPidList()) \| python shellasync.ShellAsyncListShells()<CR>
-        nnoremap <silent> <buffer> d :call shellasync#DeleteShell(shellasync#GetPidList()) \| python shellasync.ShellAsyncListShells()<CR>
-        nnoremap <silent> <buffer> x :call shellasync#DeleteShell(shellasync#GetPidList()) \| python shellasync.ShellAsyncListShells()<CR>
-        nnoremap <silent> <buffer> s :call shellasync#SendShell(-1,0,0,shellasync#GetPidList()) \| python shellasync.ShellAsyncListShells()<CR>
+        au CursorHold <buffer> pythonx shellasync.ShellAsyncListShells()
+        nnoremap <silent> <buffer> t :call shellasync#TermShell(shellasync#GetPidList()) \| pythonx shellasync.ShellAsyncListShells()<CR>
+        nnoremap <silent> <buffer> K :call shellasync#KillShell(shellasync#GetPidList()) \| pythonx shellasync.ShellAsyncListShells()<CR>
+        nnoremap <silent> <buffer> d :call shellasync#DeleteShell(shellasync#GetPidList()) \| pythonx shellasync.ShellAsyncListShells()<CR>
+        nnoremap <silent> <buffer> x :call shellasync#DeleteShell(shellasync#GetPidList()) \| pythonx shellasync.ShellAsyncListShells()<CR>
+        nnoremap <silent> <buffer> s :call shellasync#SendShell(-1,0,0,shellasync#GetPidList()) \| pythonx shellasync.ShellAsyncListShells()<CR>
         if a:selectbnr > 0
             call setbufvar("%","selectbnr",a:selectbnr)
             call setbufvar("%","selectbnrlist",1)
             nnoremap <silent> <buffer> S :call <SID>SelectShell(shellasync#GetPidList())<CR>
         endif
-        python shellasync.ShellAsyncListShells()
+        pythonx shellasync.ShellAsyncListShells()
     else
         exe winnr . 'wincmd w'
         if a:selectbnr > 0
@@ -458,14 +503,14 @@ function! shellasync#OpenShellTerminal()
     call setbufvar("%","termnr",termnr)
     call setbufvar("%","pl",1)
     call setbufvar("%","cfinished",1)
-    exe 'python shellasync.shellasync_terms['.termnr.'] = shellasync.ShellAsyncTerminal()'
+    exe 'pythonx shellasync.shellasync_terms['.termnr.'] = shellasync.ShellAsyncTerminal()'
     exe 'set updatetime='.g:shellasync_update_interval
     au BufWipeout <buffer> silent call <SID>CloseShellTerminal()
     exe 'au BufEnter <buffer> set updatetime='.g:shellasync_update_interval.' | call <SID>TerminalBufEnter()'
     au BufLeave <buffer> let &updatetime=getbufvar('%','prevupdatetime') | stopinsert
     au InsertEnter <buffer> call <SID>TerminalStartInsert()
-    au CursorHold <buffer> python shellasync.ShellAsyncTerminalRefreshOutput()
-    au CursorHoldI <buffer> python shellasync.ShellAsyncTerminalRefreshOutputI()
+    au CursorHold <buffer> pythonx shellasync.ShellAsyncTerminalRefreshOutput()
+    au CursorHoldI <buffer> pythonx shellasync.ShellAsyncTerminalRefreshOutputI()
     inoremap <silent> <buffer> <Enter> <ESC>:call <SID>TerminalEnterPressed() \| normal! 0<CR>
     inoremap <silent> <buffer> <Left> <ESC>:call <SID>TerminalLeftPressed()<CR>
     inoremap <silent> <buffer> <Right> <ESC>:call <SID>TerminalRightPressed()<CR>

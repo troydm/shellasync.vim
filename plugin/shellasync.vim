@@ -1,9 +1,9 @@
 " shellasync.vim plugin for asynchronously executing shell commands in vim
 " Maintainer: Dmitry "troydm" Geurkov <d.geurkov@gmail.com>
-" Version: 0.3.7
+" Version: 0.3.8
 " Description: shellasync.vim plugin allows you to execute shell commands
 " asynchronously inside vim and see output in seperate buffer window.
-" Last Change: 31 January, 2013
+" Last Change: 10 November, 2020
 " License: Vim License (see :help license)
 " Website: https://github.com/troydm/shellasync.vim
 "
@@ -12,41 +12,11 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-" check if running on windows {{{
-if has("win32") || has("win64")
-    let &cpo = s:save_cpo
-    unlet s:save_cpo
-    if exists("g:shellasync_suppress_load_warning") && g:shellasync_suppress_load_warning
-        finish
-    endif
-    echo "shellasync won't work windows operating system"
-    finish
-endif
-" }}}
-
-" check python support {{{
-if !has("python")
-    let &cpo = s:save_cpo
-    unlet s:save_cpo
-    if exists("g:shellasync_suppress_load_warning") && g:shellasync_suppress_load_warning
-        finish
-    endif
-    echo "shellasync needs vim compiled with +python option"
-    finish
-endif
-
-if !exists('*pyeval')
-    let &cpo = s:save_cpo
-    unlet s:save_cpo
-    if exists("g:shellasync_suppress_load_warning") && g:shellasync_suppress_load_warning
-        finish
-    endif
-    echo "shellasync needs vim 7.3 with atleast 569 patchset included"
-    finish
-endif
-" }}}
-
 " options {{{
+if !exists("g:shellasync_use_python2")
+    let g:shellasync_use_python2 = 0
+endif
+
 if !exists("g:shellasync_print_return_value")
     let g:shellasync_print_return_value = 0
 endif
@@ -79,7 +49,7 @@ command! -complete=customlist,<SID>ShellPidCompletion -nargs=? ShellSelect call 
 command! ShellSelected call shellasync#ShellSelected(bufnr('%'))
 command! ShellList call shellasync#OpenShellsList(0)
 command! ShellTerminal call shellasync#OpenShellTerminal()
-au VimLeavePre * if g:shellasync_loaded | exe 'python shellasync.ShellAsyncTermAllCmds()' | endif
+au VimLeavePre * if g:shellasync_loaded | exe 'pythonx shellasync.ShellAsyncTermAllCmds()' | endif
 " }}}
 
 let &cpo = s:save_cpo
