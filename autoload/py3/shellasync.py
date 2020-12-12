@@ -73,8 +73,12 @@ class ShellAsyncOutput(threading.Thread):
                     else:
                         plr = plr[0][1]
                         try:
-                            if plr & select.POLLIN or plr & select.POLLPRI:
-                                outread = p.stdout.read().decode('utf-8', 'ignore')
+                            if (plr & (select.POLLIN | select.POLLPRI | select.POLLOUT | select.POLLNVAL)) > 0:
+                                output = p.stdout.read()
+                                if output != None:
+                                    outread = output.decode('utf-8', 'ignore')
+                                else:
+                                    outread = ''
                             else:
                                 outread = ''
                         except IOError:
