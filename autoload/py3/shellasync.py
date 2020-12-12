@@ -141,6 +141,9 @@ class ShellAsyncOutput(threading.Thread):
         if self.print_retval:
             self.extend(["","Shell command "+self.command+" completed with exit status "+str(retval)])
 
+    def isAlive(self):
+        return self.is_alive()
+
     def isRunning(self):
         self.lock.acquire()
         ret = self.retval == None
